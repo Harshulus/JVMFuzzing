@@ -284,6 +284,24 @@ class Fuzzer:
 
         return start_idx, end_idx, code_attr_length
 
+    def parse_tlv(self, data):
+        tlv_instructions = []
+
+        i = 0
+        while i < len(data):
+            # Extract tag, length, and value
+            tag = data[i]
+            length = data[i + 1]
+            value = data[i + 2 : i + 2 + length]
+
+            # Add the TLV instruction to the list
+            tlv_instructions.append({"tag": tag, "length": length, "value": value})
+
+            # Move the index to the next TLV instruction
+            i += 2 + length
+
+        return tlv_instructions
+
     def get_valid(self, num: int, min_len: int, max_err: int) -> list:
         """
         Returns a list of complete sequences of instructions for the JVM.
@@ -301,19 +319,15 @@ class Fuzzer:
         end = f.read(-1)
         f.close()
 
-        valid = list()
+        valid = []
         while len(valid) < num:
-            valid.append(
-                self.generate(min_len, max_err, start, end, code_attr_length, tlv=True)
+            tlv_data = self.generate(
+                min_len, max_err, start, end, code_attr_length, tlv=True
             )
+            instructions = self.parse_tlv(tlv_data)  # Parse TLV-encoded data
 
-        # Converting the byte string into a list of the numeric values of each byte
-        #   e.g. b"\x08" becomes [8]
-        for i in range(len(valid)):
-            tmp = valid[i]
-            valid[i] = list()
-            for j in range(len(tmp)):
-                valid[i].append(tmp[j])
+            # Append the parsed TLV instructions to the valid list
+            valid.append({"tlv_data": tlv_data, "instructions": instructions})
 
         return valid
 
@@ -323,4 +337,12 @@ if __name__ == "__main__":
     length = 400
     max_err = 40
     valid = Fuzzer().get_valid(count, length, max_err)
-    print(*valid, sep="\n")
+
+    for i, entry in enumerate(valid):
+        print(f"Sequence {i + 1} - TLV Data: {entry['tlv_data']}")
+        print("Parsed Instructions:")
+        for j, instruction in enumerate(entry["instructions"]):
+            print(f"  Instruction {j + 1}:")
+            print(f"    Tag: {instruction['tag']}")
+            print(f"    Length: {instruction['length']}")
+            print(f"    Value: {instruction['value']}")
