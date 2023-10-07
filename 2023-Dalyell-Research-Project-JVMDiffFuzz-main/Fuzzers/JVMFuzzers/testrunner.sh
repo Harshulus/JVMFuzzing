@@ -13,7 +13,7 @@ sdk use java 20-$JVM
 
 #Compiling the classfile
 cd ../template
-python classmaker.py
+# python classmaker.py
 rm *.class
 javac -g:none *.java
 cd ../JVMFuzzers

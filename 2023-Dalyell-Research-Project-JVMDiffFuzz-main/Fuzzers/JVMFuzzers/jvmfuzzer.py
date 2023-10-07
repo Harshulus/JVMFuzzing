@@ -52,7 +52,7 @@ class Fuzzer:
         stderr = result.stderr.decode("utf-8")
 
         if DEBUG:
-            print(result.stdout.decode("utf-8"))
+            # print(result.stdout.decode("utf-8"))
             print(stderr)
 
         if len(stderr) != 0:
@@ -254,54 +254,24 @@ class Fuzzer:
             ):
                 num = random.randrange(0, 255)
 
-            # Backtrack
-            if BACKTRACK and err_cnt > max_err:
-                instructions = instructions[:-1]
-                total = (
-                    (code_attr_len + len(instructions)).to_bytes(4, byteorder="big")
-                    + pre
-                    + len(instructions).to_bytes(4, byteorder="big")
-                    + instructions
-                )
+            # Check if the instruction is in TLV format (Type-Length-Value)
+            is_tlv_format = (
+                len(instructions) >= 3
+                and instructions[-3] == 0x01
+                and instructions[-2] == 0x01
+            )
 
-                if DEBUG:
-                    print(total)
+            if not is_tlv_format:
+                # If not in TLV format, encode it as TLV
+                instruction = bytes([0x01, 0x01, num])
+            else:
+                # If already in TLV format, just append the instruction
+                instruction = bytes([num])
 
-                f = open(f"output_classes/test{self.num_created}/test.class", "wb")
-                f.write(start)
-                f.write(total)
-                f.write(end)
-                f.close()
-                result = self.execute_binary()
-
-                while result == "Bad":
-                    instructions = instructions[:-1]
-                    total = (
-                        (code_attr_len + len(instructions)).to_bytes(4, byteorder="big")
-                        + pre
-                        + len(instructions).to_bytes(4, byteorder="big")
-                        + instructions
-                    )
-
-                    if DEBUG:
-                        print(total)
-
-                    f = open(f"output_classes/test{self.num_created}/test.class", "wb")
-                    f.write(start)
-                    f.write(total)
-                    f.write(end)
-                    f.close()
-                    result = self.execute_binary()
-
-                err_cnt = 0
-                continue
+            instructions += instruction
 
             if DEBUG:
                 print(len(instructions), num)
-
-            # TLV encoding: Type (1 byte), Length (1 byte), Value (1 byte)
-            instruction = bytes([0x01, 0x01, num])
-            instructions += instruction
 
             # Need to write the input to a temp file, can't pass through the subprocess since 0x00 is a valid instruction
             #   but will cause the subprocess to run into the wrong null terminator
@@ -487,4 +457,4 @@ class Fuzzer:
 
 if __name__ == "__main__":
     valid = Fuzzer().get_valid(NUM_SEQ, MIN_LEN, MAX_ERR)
-    print(*valid, sep="\n")
+    # print(*valid, sep="\n")
